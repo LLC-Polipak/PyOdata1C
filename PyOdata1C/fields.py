@@ -24,49 +24,38 @@ class FilterResultField:
 class Field:
     source: str
     expand: str | None = None
-    cast: bool = False
     cast_on: str | None = None
 
-    def __init__(self, source: str, cast: bool = False, cast_on: str | None = None):
+    def __init__(self, source: str, cast_on: str | None = None):
         self.source = source
         if DELIMITER in source:
             self.expand = '/'.join(source.split(DELIMITER)[:-1])
-        if cast:
-            if cast_on is None:
-                raise TypeError("If cast == True then cast_on can't be None")
-            self.cast = cast
-            self.cast_on = cast_on
+        self.cast_on = cast_on
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        if self.cast:
-            return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} {other}")
-        else:
-            return FilterResultField(f"{self.source} {operand} {other}")
+        # if self.cast:
+        return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} {other}") if self.cast_on else FilterResultField(f"{self.source} {operand} {other}")
 
-    def __eq__(self, other: int) -> FilterResultField:
+    def __eq__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'eq')
 
-    def __ne__(self, other: int) -> FilterResultField:
+    def __ne__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'ne')
 
-    def __lt__(self, other: int) -> FilterResultField:
+    def __lt__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'lt')
 
-    def __le__(self, other: int) -> FilterResultField:
+    def __le__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'le')
 
-    def __ge__(self, other: int) -> FilterResultField:
+    def __ge__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'ge')
 
-    def __gt__(self, other: int) -> FilterResultField:
+    def __gt__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'gt')
 
     def __str__(self):
         return self.source
-
-
-a = Field('a', True, cast_on='da')
-print(a.cast_on)
 
 
 class IntegerField(Field):
@@ -84,32 +73,32 @@ class StringField(Field):
     def __getitem__(self, item: int | slice):
         """1c analog of substring"""
         if isinstance(item, int):
-            return StringField(f"substring({self.source}, {item}, {item})", self.cast, self.cast_on)
+            return StringField(f"substring({self.source}, {item}, {item})", self.cast_on)
         elif isinstance(item, slice):
             if item.start:
                 start = item.start
             else:
                 start = 0
             if item.stop:
-                return StringField(f"substring({self.source}, {start+1}, {item.stop})", self.cast, self.cast_on)
+                return StringField(f"substring({self.source}, {start+1}, {item.stop})", self.cast_on)
             else:
-                return StringField(f"substring({self.source}, {start+1})", self.cast, self.cast_on)
+                return StringField(f"substring({self.source}, {start+1})", self.cast_on)
         else:
             raise TypeError(f'item in block quotes should be int or slice, not {type(item)}')
 
     def __add__(self, other: str | Field):
         if isinstance(other, str):
-            return StringField(f"concat({self.source}, '{other}')", self.cast, self.cast_on)
+            return StringField(f"concat({self.source}, '{other}')", self.cast_on)
         if issubclass(type(other), Field):
-            return StringField(f"concat({self.source}, {other})", self.cast, self.cast_on)
+            return StringField(f"concat({self.source}, {other})", self.cast_on)
         else:
             raise TypeError(f"cant concatenate {type(other)} with StringField, use FieldType or str")
 
     def __radd__(self, other: str | Field):
         if isinstance(other, str):
-            return StringField(f"concat('{other}', {self.source})", self.cast, self.cast_on)
+            return StringField(f"concat('{other}', {self.source})", self.cast_on)
         if issubclass(type(other), Field):
-            return StringField(f"concat({other}, {self.source})", self.cast, self.cast_on)
+            return StringField(f"concat({other}, {self.source})", self.cast_on)
         else:
             raise TypeError(f"cant concatenate {type(other)} with StringField, use FieldType or str")
 
@@ -132,19 +121,14 @@ class StringField(Field):
 
 class DateTimeField(Field):
 
-    def __init__(self, source: str, cast: bool = False, cast_on: str | None = None, dt_format: str = DATETIME_FORMAT):
-        super().__init__(source, cast, cast_on)
+    def __init__(self, source: str, cast_on: str | None = None, dt_format: str = DATETIME_FORMAT):
+        super().__init__(source, cast_on)
         self.dt_format = dt_format
-
-    @staticmethod
-    def __validate_compare_value(other: str):
-        datetime.strptime(other, DATETIME_FORMAT)
-        return True
 
     def __cast_compare_value_to_string(self, other: str | float | datetime) -> str:
         if isinstance(other, str):
-            if self.__validate_compare_value(other):
-                return other
+            datetime.strptime(other, self.dt_format)
+            return other
         elif isinstance(other, datetime):
             return datetime.strftime(other, self.dt_format)
         elif isinstance(other, float):
@@ -154,7 +138,7 @@ class DateTimeField(Field):
             raise TypeError('value to compare should be formatted str, float timestamp or datetime object')
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        if self.cast:
+        if self.cast_on:
             return FilterResultField(f"cast({self.source}) {operand} datetime'{other}'")
         else:
             return FilterResultField(f"{self.source} {operand} datetime'{other}'")
@@ -220,7 +204,7 @@ class DateTimeField(Field):
 class GUIDField(StringField):
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        if self.cast:
+        if self.cast_on:
             return FilterResultField(f"cast({self.source}) {operand} guid'{other}'")
         else:
             return FilterResultField(f"{self.source} {operand} guid'{other}'")

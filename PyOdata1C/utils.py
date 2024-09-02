@@ -2,7 +2,7 @@ from .fields import FilterResultField
 
 
 def _not(s: FilterResultField):
-    return f"not({s})"
+    return FilterResultField(f"not({s})")
 
 
 def isof():
