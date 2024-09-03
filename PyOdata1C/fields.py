@@ -65,7 +65,7 @@ class IntegerField(Field):
 class StringField(Field):
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        if self.cast:
+        if self.cast_on:
             return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} '{other}'")
         else:
             return FilterResultField(f"{self.source} {operand} '{other}'")
@@ -149,23 +149,23 @@ class DateTimeField(Field):
 
     def __ne__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
-        return self._build_result_field(value, 'eq')
+        return self._build_result_field(value, 'ne')
 
     def __lt__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
-        return self._build_result_field(value, 'eq')
+        return self._build_result_field(value, 'lt')
 
     def __le__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
-        return self._build_result_field(value, 'eq')
+        return self._build_result_field(value, 'le')
 
     def __ge__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
-        return self._build_result_field(value, 'eq')
+        return self._build_result_field(value, 'ge')
 
     def __gt__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
-        return self._build_result_field(value, 'eq')
+        return self._build_result_field(value, 'gt')
 
     def year(self) -> IntegerField:
         return IntegerField(f"year({self.source})")

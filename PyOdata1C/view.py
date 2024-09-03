@@ -55,7 +55,7 @@ class View:
         if self.__select_params:
             query_params['$select'] = self.__select_params
         if self.__filter_params:
-            query_params['$filter'] = self.__select_params
+            query_params['$filter'] = self.__filter_params
         if self.__expand_params:
             query_params['$expand'] = self.__expand_params
 
