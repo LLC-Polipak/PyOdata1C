@@ -1,4 +1,4 @@
-class Base1cError(BaseException):
+class Base1cError(Exception):
     code: int | None = None
     text: str | None = None
 
