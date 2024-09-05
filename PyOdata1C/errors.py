@@ -164,3 +164,7 @@ exception_mapper = {
 
 def throw_exception(data: dict):
     raise exception_mapper[data['odata.error']['code']]
+
+
+class ValidationError(Exception):
+    pass

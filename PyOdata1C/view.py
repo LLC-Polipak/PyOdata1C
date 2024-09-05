@@ -3,8 +3,8 @@ from urllib.parse import urlencode, quote
 
 import requests
 
-from .errors import throw_exception
-from .serializer import Serializer
+from PyOdata1C.errors import throw_exception
+from PyOdata1C.serializer import Serializer
 
 
 class Config:
@@ -26,20 +26,38 @@ class Config:
 
 
 class View:
-    config: Config = Config
+    config: Config = None
     __select_params: str | None = None
     __filter_params: str | None = None
     __expand_params: str | None = None
-    serializer_class: Serializer = Serializer
-    # pagination_class = OdataPagination
-    url = f'{config.base_url}{serializer_class.path}'
+    __top: int | None = None
+    __skip: int | None = None
+    serializer_class: Serializer | None = None
 
-    def select(self, params: List[str]):
-        self.__select_params = ','.join(params)
+    @classmethod
+    def _url(cls):
+        return f'{cls.config.base_url}{cls.serializer_class.path}'
+
+    def select(self, params: List[str] | None = None):
+        if params:
+            self.__select_params = ','.join(params)
+        else:
+            self.__select_params = ','.join(self.serializer_class.get_select())
         return self
 
-    def expand(self, params: List[str]):
-        self.__expand_params = ','.join(params)
+    def expand(self, params: List[str] | None = None):
+        if self.__expand_params:
+            self.__expand_params = ','.join(params)
+        else:
+            self.__expand_params = ','.join(self.serializer_class.get_expand())
+        return self
+
+    def top(self, num: int):
+        self.__top = num
+        return self
+
+    def skip(self, num: int):
+        self.__skip = num
         return self
 
     def expand_all(self):
@@ -50,7 +68,7 @@ class View:
         self.__filter_params = fmt_str
         return self
 
-    def get(self):
+    def _configure_query_params(self):
         query_params = {}
         if self.__select_params:
             query_params['$select'] = self.__select_params
@@ -58,17 +76,21 @@ class View:
             query_params['$filter'] = self.__filter_params
         if self.__expand_params:
             query_params['$expand'] = self.__expand_params
+        if self.__top:
+            query_params['$top'] = self.__top
+        if self.__skip:
+            query_params['$skip'] = self.__skip
+        return urlencode(query_params, quote_via=quote)
 
-        encoded_query_params = urlencode(query_params, quote_via=quote)
-        r = requests.get(url=self.url, params=encoded_query_params,
+    def get(self):
+        r = requests.get(url=self._url(), params=self._configure_query_params(),
                          auth=self.config.get_auth_credentials(), headers=self.config.headers())
         if r.status_code != 200:
             throw_exception(r.json())
-
+        data = r.json()['value']
+        return self.serializer_class.deserialize(data)
 
     def create(self, body: Dict[str, Any]):
-        r = requests.post(self.url, data=body, auth=self.config.get_auth_credentials(), headers=self.config.headers())
+        r = requests.post(self._url(), data=body, auth=self.config.get_auth_credentials(), headers=self.config.headers())
         if r.status_code != 201:
             throw_exception(r.json())
-
-
