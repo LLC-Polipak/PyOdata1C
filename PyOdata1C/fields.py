@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Callable, List
+from errors import ValidationError
 
 
 DELIMITER = '/'
@@ -17,6 +19,12 @@ class FilterResultField:
     def __or__(self, other):
         return FilterResultField(f"{self.result} or {other}")
 
+    def __rand__(self, other):
+        return FilterResultField(f"{other} and {self.result}")
+
+    def __ror__(self, other):
+        return FilterResultField(f"{other} or {self.result}")
+
     def __str__(self):
         return self.result
 
@@ -25,16 +33,34 @@ class Field:
     source: str
     expand: str | None = None
     cast_on: str | None = None
+    select: bool = True
+    validate_function: Callable | None = None
+    validators: List[Callable] | None = None
+    null: bool = False
 
-    def __init__(self, source: str, cast_on: str | None = None):
+    def __init__(
+            self,
+            source: str,
+            cast_on: str | None = None,
+            select=True,
+            validators: List[Callable] | None = None,
+            null: bool = False
+    ):
         self.source = source
+        self.select = select
+        self.validators = validators
+        self.cast_on = cast_on
+        self.null = null
         if DELIMITER in source:
             self.expand = '/'.join(source.split(DELIMITER)[:-1])
-        self.cast_on = cast_on
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        # if self.cast:
         return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} {other}") if self.cast_on else FilterResultField(f"{self.source} {operand} {other}")
+
+    def field_mapper(self, *args, **kwargs):
+        if args[0] is None and not self.null:
+            raise ValidationError
+        return self.validate_function(*args, **kwargs)
 
     def __eq__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'eq')
@@ -58,11 +84,20 @@ class Field:
         return self.source
 
 
+class BoolField(Field):
+    validate_function = bool
+
+
 class IntegerField(Field):
-    pass
+    validate_function = int
+
+
+class FloatField(IntegerField):
+    validate_function = float
 
 
 class StringField(Field):
+    validate_function = str
 
     def _build_result_field(self, other, operand) -> FilterResultField:
         if self.cast_on:
@@ -120,9 +155,18 @@ class StringField(Field):
 
 
 class DateTimeField(Field):
+    validate_function = datetime.strptime
 
-    def __init__(self, source: str, cast_on: str | None = None, dt_format: str = DATETIME_FORMAT):
-        super().__init__(source, cast_on)
+    def __init__(
+            self,
+            source: str,
+            cast_on: str | None = None,
+            dt_format: str = DATETIME_FORMAT,
+            select: bool = True,
+            validators: List[Callable] | None = None,
+            null: bool = False
+    ):
+        super().__init__(source, cast_on, select, validators, null)
         self.dt_format = dt_format
 
     def __cast_compare_value_to_string(self, other: str | float | datetime) -> str:
@@ -142,6 +186,9 @@ class DateTimeField(Field):
             return FilterResultField(f"cast({self.source}) {operand} datetime'{other}'")
         else:
             return FilterResultField(f"{self.source} {operand} datetime'{other}'")
+
+    def field_mapper(self, date_string):
+        return self.validate_function(date_string, self.dt_format)
 
     def __eq__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
