@@ -1,7 +1,7 @@
 from datetime import datetime
+from decimal import Decimal, getcontext
 from typing import Callable, List
 from errors import ValidationError
-
 
 DELIMITER = '/'
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
@@ -55,7 +55,9 @@ class Field:
             self.expand = '/'.join(source.split(DELIMITER)[:-1])
 
     def _build_result_field(self, other, operand) -> FilterResultField:
-        return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} {other}") if self.cast_on else FilterResultField(f"{self.source} {operand} {other}")
+        return FilterResultField(
+            f"cast({self.source}, '{self.cast_on}') {operand} {other}") if self.cast_on else FilterResultField(
+            f"{self.source} {operand} {other}")
 
     def field_mapper(self, *args, **kwargs):
         if args[0] is None and not self.null:
@@ -96,6 +98,26 @@ class FloatField(IntegerField):
     validate_function = float
 
 
+class DecimalField(Field):
+    validate_function = Decimal
+
+    def __init__(
+            self,
+            source: str,
+            cast_on: str | None = None,
+            select=True,
+            validators: List[Callable] | None = None,
+            null: bool = False,
+            precision: int = 3
+    ):
+        super().__init__(source, cast_on, select, validators, null)
+        self.precision = precision
+
+    def field_mapper(self, *args, **kwargs):
+        getcontext().prec = self.precision
+        return super().field_mapper(*args, **kwargs)
+
+
 class StringField(Field):
     validate_function = str
 
@@ -115,9 +137,9 @@ class StringField(Field):
             else:
                 start = 0
             if item.stop:
-                return StringField(f"substring({self.source}, {start+1}, {item.stop})", self.cast_on)
+                return StringField(f"substring({self.source}, {start + 1}, {item.stop})", self.cast_on)
             else:
-                return StringField(f"substring({self.source}, {start+1})", self.cast_on)
+                return StringField(f"substring({self.source}, {start + 1})", self.cast_on)
         else:
             raise TypeError(f'item in block quotes should be int or slice, not {type(item)}')
 
