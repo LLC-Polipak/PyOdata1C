@@ -8,7 +8,6 @@ from PyOdata1C.serializer import Serializer
 
 
 class Config:
-    # ???
     username: str | None = None
     password: str | None = None
     base_url: str | None = None
@@ -35,7 +34,7 @@ class View:
     serializer_class: Serializer | None = None
 
     @classmethod
-    def _url(cls):
+    def _url(cls) -> str:
         return f'{cls.config.base_url}{cls.serializer_class.path}'
 
     def select(self, params: List[str] | None = None):
@@ -68,7 +67,7 @@ class View:
         self.__filter_params = fmt_str
         return self
 
-    def _configure_query_params(self):
+    def _configure_query_params(self) -> str:
         query_params = {}
         if self.__select_params:
             query_params['$select'] = self.__select_params
@@ -82,7 +81,7 @@ class View:
             query_params['$skip'] = self.__skip
         return urlencode(query_params, quote_via=quote)
 
-    def get(self):
+    def get(self) -> list[Serializer]:
         r = requests.get(url=self._url(), params=self._configure_query_params(),
                          auth=self.config.get_auth_credentials(), headers=self.config.headers())
         if r.status_code != 200:
@@ -90,7 +89,11 @@ class View:
         data = r.json()['value']
         return self.serializer_class.deserialize(data)
 
-    def create(self, body: Dict[str, Any]):
+    def create(self, body: Dict[str, Any] | Serializer) -> Serializer:
+        if issubclass(type(body), Serializer):
+            body = self.serializer_class.serialize(body)
         r = requests.post(self._url(), data=body, auth=self.config.get_auth_credentials(), headers=self.config.headers())
         if r.status_code != 201:
             throw_exception(r.json())
+        data = r.json()['value']
+        return self.serializer_class.deserialize(data)
