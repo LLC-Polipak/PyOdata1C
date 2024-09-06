@@ -8,6 +8,9 @@ class Serializer:
     _data: dict = {}
 
     def __init__(self, **kwargs):
+        for kwarg in kwargs.keys():
+            if kwarg not in self._get_fields_for_props():
+                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{kwarg}'")
         self._data = kwargs
 
     def __setattr__(self, key, value):
@@ -19,7 +22,7 @@ class Serializer:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
 
     def __getattribute__(self, item):
-        if item in object.__getattribute__(self, '_get_fields_for_props')():
+        if item in object.__getattribute__(self, '_get_fields_for_props')() and item != 'data':
             return self.__getattr__(item)
         return super().__getattribute__(item)
 
@@ -33,6 +36,14 @@ class Serializer:
             del self._data[item]
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
+    def __iter__(self):
+        for key in self._data:
+            yield key, self._data[key]
+
+    @property
+    def data(self):
+        return self._data
+
     @classmethod
     def _get_fields_for_props(cls):
         return list(filter(lambda x: not x.startswith('_'), dir(cls)))
@@ -44,28 +55,22 @@ class Serializer:
             cls.__dict__.items())).keys()))
 
     @classmethod
-    def _get_fields(cls) -> List[Field]:
+    def _get_fields(cls) -> list[Field]:
         return [getattr(cls, field) for field in dict(filter(
             lambda x: issubclass(type(x[1]), Field),
             cls.__dict__.items())).keys()]
 
     @classmethod
-    def get_expand(cls) -> List[str]:
+    def get_expand(cls) -> list[str]:
         return [field.expand for field in cls._get_fields()
                 if field.expand is not None]
 
     @classmethod
-    def get_select(cls) -> List[str]:
+    def get_select(cls) -> list[str]:
         return [field.source for field in cls._get_fields() if field.select]
 
     @classmethod
     def validate(cls, data: dict):
-
-        # class Model:
-        #     def __init__(self, **kwargs):
-        #         for key, value in kwargs.items():
-        #             setattr(self, key, value)
-
         new_data = {}
         for str_field in cls._get_selected_fields_str():
             field = getattr(cls, str_field)
@@ -91,5 +96,9 @@ class Serializer:
         return validated_data
 
     @classmethod
-    def serialize(cls, **kwargs):
-        pass
+    def serialize(cls, obj) -> dict:
+        data = {}
+        for str_field in cls._get_selected_fields_str():
+            field = getattr(obj, str_field)
+            data[str_field] = field
+        return data
