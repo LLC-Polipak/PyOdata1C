@@ -82,8 +82,11 @@ class View:
         return urlencode(query_params, quote_via=quote)
 
     def get(self) -> list[Serializer]:
-        r = requests.get(url=self._url(), params=self._configure_query_params(),
-                         auth=self.config.get_auth_credentials(), headers=self.config.headers())
+        r = requests.get(url=self._url(),
+                         params=self._configure_query_params(),
+                         auth=self.config.get_auth_credentials(),
+                         headers=self.config.headers()
+                         )
         if r.status_code != 200:
             throw_exception(r.json())
         data = r.json()['value']
@@ -92,7 +95,10 @@ class View:
     def create(self, body: Dict[str, Any] | Serializer) -> Serializer:
         if issubclass(type(body), Serializer):
             body = self.serializer_class.serialize(body)
-        r = requests.post(self._url(), data=body, auth=self.config.get_auth_credentials(), headers=self.config.headers())
+        r = requests.post(
+            self._url(), data=body, auth=self.config.get_auth_credentials(),
+            headers=self.config.headers()
+        )
         if r.status_code != 201:
             throw_exception(r.json())
         data = r.json()['value']

@@ -10,7 +10,8 @@ class Serializer:
     def __init__(self, **kwargs):
         for kwarg in kwargs.keys():
             if kwarg not in self._get_fields_for_props():
-                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{kwarg}'")
+                raise AttributeError(
+                    f"'{self.__class__.__name__}' object has no attribute '{kwarg}'")
         self._data = kwargs
 
     def __setattr__(self, key, value):
@@ -19,22 +20,26 @@ class Serializer:
         elif key in self._get_fields_for_props():
             self._data[key] = value
         else:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{key}'")
 
     def __getattribute__(self, item):
-        if item in object.__getattribute__(self, '_get_fields_for_props')() and item != 'data':
+        if item in object.__getattribute__(
+                self, '_get_fields_for_props')() and item != 'data':
             return self.__getattr__(item)
         return super().__getattribute__(item)
 
     def __getattr__(self, item):
         if item in self._get_fields_for_props():
             return self._data[item]
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
     def __delattr__(self, item):
         if item in self._get_fields_for_props():
             del self._data[item]
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
     def __iter__(self):
         for key in self._data:
@@ -74,7 +79,6 @@ class Serializer:
         new_data = {}
         for str_field in cls._get_selected_fields_str():
             field = getattr(cls, str_field)
-            # тут нужно подкинуть валидатор
             if field.expand:
                 obj = data
                 for x in field.source.split(DELIMITER):
@@ -85,8 +89,8 @@ class Serializer:
             else:
                 obj = data[field.source]
             new_data[str_field] = field.field_mapper(obj)
+            field.validate(new_data[str_field])
         return cls(**new_data)
-        # return Model(**new_data)
 
     @classmethod
     def deserialize(cls, data):
