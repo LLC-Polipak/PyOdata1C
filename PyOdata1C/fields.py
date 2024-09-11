@@ -1,7 +1,10 @@
 from datetime import datetime
 from decimal import Decimal, getcontext
 from typing import Callable, List
-from errors import ValidationError
+
+from PyOdata1C.errors import ValidationError
+from PyOdata1C.validators import EmailValidator, PhoneNumberValidator
+
 
 DELIMITER = '/'
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
@@ -56,13 +59,20 @@ class Field:
 
     def _build_result_field(self, other, operand) -> FilterResultField:
         return FilterResultField(
-            f"cast({self.source}, '{self.cast_on}') {operand} {other}") if self.cast_on else FilterResultField(
-            f"{self.source} {operand} {other}")
+            f"cast({self.source}, '{self.cast_on}') {operand} {other}"
+        ) if self.cast_on else FilterResultField(
+            f"{self.source} {operand} {other}"
+        )
 
     def field_mapper(self, *args, **kwargs):
         if args[0] is None and not self.null:
             raise ValidationError
         return self.validate_function(*args, **kwargs)
+
+    def validate(self, value):
+        if self.validators:
+            for validator in self.validators:
+                validator(value)
 
     def __eq__(self, other) -> FilterResultField:
         return self._build_result_field(other, 'eq')
@@ -121,7 +131,11 @@ class DecimalField(Field):
 class StringField(Field):
     validate_function = str
 
-    def _build_result_field(self, other, operand) -> FilterResultField:
+    def _build_result_field(
+            self,
+            other,
+            operand
+    ) -> FilterResultField:
         if self.cast_on:
             return FilterResultField(f"cast({self.source}, '{self.cast_on}') {operand} '{other}'")
         else:
@@ -137,7 +151,9 @@ class StringField(Field):
             else:
                 start = 0
             if item.stop:
-                return StringField(f"substring({self.source}, {start + 1}, {item.stop})", self.cast_on)
+                return StringField(
+                    f"substring({self.source}, {start + 1}, {item.stop})", self.cast_on
+                )
             else:
                 return StringField(f"substring({self.source}, {start + 1})", self.cast_on)
         else:
@@ -149,7 +165,9 @@ class StringField(Field):
         if issubclass(type(other), Field):
             return StringField(f"concat({self.source}, {other})", self.cast_on)
         else:
-            raise TypeError(f"cant concatenate {type(other)} with StringField, use FieldType or str")
+            raise TypeError(
+                f"cant concatenate {type(other)} with StringField, use FieldType or str"
+            )
 
     def __radd__(self, other: str | Field):
         if isinstance(other, str):
@@ -157,7 +175,9 @@ class StringField(Field):
         if issubclass(type(other), Field):
             return StringField(f"concat({other}, {self.source})", self.cast_on)
         else:
-            raise TypeError(f"cant concatenate {type(other)} with StringField, use FieldType or str")
+            raise TypeError(
+                f"cant concatenate {type(other)} with StringField, use FieldType or str"
+            )
 
     # ref
     def substringof(self, item: str) -> FilterResultField:
@@ -201,7 +221,9 @@ class DateTimeField(Field):
             dt = datetime.fromtimestamp(other)
             return datetime.strftime(dt, self.dt_format)
         else:
-            raise TypeError('value to compare should be formatted str, float timestamp or datetime object')
+            raise TypeError(
+                'value to compare should be formatted str, float timestamp or datetime object'
+            )
 
     def _build_result_field(self, other, operand) -> FilterResultField:
         if self.cast_on:
@@ -277,3 +299,17 @@ class GUIDField(StringField):
             return FilterResultField(f"cast({self.source}) {operand} guid'{other}'")
         else:
             return FilterResultField(f"{self.source} {operand} guid'{other}'")
+
+
+class EmailField(StringField):
+
+    def field_mapper(self, *args, **kwargs):
+        EmailValidator()(*args, **kwargs)
+        return self.validate_function(*args, **kwargs)
+
+
+class PhoneNumberField(StringField):
+
+    def field_mapper(self, *args, **kwargs):
+        PhoneNumberValidator()(*args, **kwargs)
+        return self.validate_function(*args, **kwargs)
