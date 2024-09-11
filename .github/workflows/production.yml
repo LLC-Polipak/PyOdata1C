@@ -1,0 +1,27 @@
+name: CI-production
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.5"
+          architecture: x64
+      - name: dependencies
+        run: pip install -r requirements.txt
+        working-directory: .
+      - name: linter
+        run: flake8 PyOdata1C --statistics
+        working-directory: .
