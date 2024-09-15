@@ -13,7 +13,7 @@ class BaseValidator:
 
     def __call__(self, *args, **kwargs):
         if not self.compare(self.limit_value, *args, **kwargs):
-            raise ValidationError(self.message)
+            raise ValidationError(self.__class__.message % self.limit_value)
 
     @classmethod
     def compare(cls, a, b):
@@ -21,7 +21,7 @@ class BaseValidator:
 
 
 class MaxValueValidator(BaseValidator):
-    message = 'Значение больше или равно максимальному'
+    message = 'Значение больше или равно максимальному - %d'
 
     @classmethod
     def compare(cls, a, b):
@@ -29,7 +29,7 @@ class MaxValueValidator(BaseValidator):
 
 
 class MinValueValidator(BaseValidator):
-    message = 'Значение меньше или равно минимальному'
+    message = 'Значение меньше или равно минимальному - %d'
 
     @classmethod
     def compare(cls, a, b):
@@ -46,19 +46,19 @@ class BaseStringValidator:
 
     def __call__(self, *args, **kwargs):
         if not self.compare(self.string_pattern, *args, **kwargs):
-            raise ValidationError(self.message)
+            raise ValidationError(self.__class__.message % str(self.string_pattern))
 
-    @classmethod
-    def compare(cls, pattern, value):
-        return pattern is not value
+    @staticmethod
+    def compare(pattern, value):
+        return pattern == value
 
 
 class RegexValidator(BaseStringValidator):
-    message = 'Значение не соответствует шаблону'
+    message = 'Значение не соответствует шаблону - %s'
 
-    @classmethod
-    def compare(cls, pattern, value):
-        return re.search(pattern, str(value))
+    @staticmethod
+    def compare(pattern, value):
+        return bool(re.search(pattern, str(value)))
 
 
 class ReadyRegexValidator(RegexValidator):
@@ -75,5 +75,5 @@ class EmailValidator(ReadyRegexValidator):
 
 
 class PhoneNumberValidator(ReadyRegexValidator):
-    message = 'Поле не является номером телефона'
+    message = 'Поле не является номером телефона %s'
     str_pattern = r'^((8|\+7)[\- ]?)?(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$'

@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List
 from urllib.parse import urlencode, quote
 
@@ -25,7 +26,7 @@ class Config:
 
 
 class View:
-    config: Config = None
+    config: Config | None = None
     __select_params: str | None = None
     __filter_params: str | None = None
     __expand_params: str | None = None
@@ -90,16 +91,16 @@ class View:
         if r.status_code != 200:
             throw_exception(r.json())
         data = r.json()['value']
-        return self.serializer_class.deserialize(data)
+        return self.serializer_class.deserialize(data, many=True)
 
     def create(self, body: Dict[str, Any] | Serializer) -> Serializer:
-        if issubclass(type(body), Serializer):
+        if isinstance(body, Serializer):
             body = self.serializer_class.serialize(body)
         r = requests.post(
-            self._url(), data=body, auth=self.config.get_auth_credentials(),
+            self._url(), data=json.dumps(body), auth=self.config.get_auth_credentials(),
             headers=self.config.headers()
         )
         if r.status_code != 201:
             throw_exception(r.json())
-        data = r.json()['value']
+        data = r.json()
         return self.serializer_class.deserialize(data)

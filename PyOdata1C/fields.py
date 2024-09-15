@@ -11,9 +11,8 @@ DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
 
 class FilterResultField:
-    result: str
 
-    def __init__(self, result):
+    def __init__(self, result: str):
         self.result = result
 
     def __and__(self, other):
@@ -33,20 +32,18 @@ class FilterResultField:
 
 
 class Field:
-    source: str
     expand: str | None = None
-    cast_on: str | None = None
-    select: bool = True
-    validate_function: Callable | None = None
-    validators: List[Callable] | None = None
+    deserialize_function: Callable | None = None
+    serialize_function: Callable | None = None
+    validators: list[Callable] | None = None
     null: bool = False
 
     def __init__(
             self,
             source: str,
             cast_on: str | None = None,
-            select=True,
-            validators: List[Callable] | None = None,
+            select: bool = True,
+            validators: list[Callable] | None = None,
             null: bool = False
     ):
         self.source = source
@@ -64,10 +61,15 @@ class Field:
             f"{self.source} {operand} {other}"
         )
 
-    def field_mapper(self, *args, **kwargs):
-        if args[0] is None and not self.null:
+    def deserialize(self, *args, **kwargs):
+        if not args and not self.null:
             raise ValidationError
-        return self.validate_function(*args, **kwargs)
+        return self.deserialize_function(*args, **kwargs)
+
+    def serialize(self, *args, **kwargs):
+        if self.serialize_function:
+            return self.serialize_function(*args, **kwargs)
+        return self.deserialize_function(*args, **kwargs)
 
     def validate(self, value):
         if self.validators:
@@ -97,20 +99,21 @@ class Field:
 
 
 class BoolField(Field):
-    validate_function = bool
+    deserialize_function = bool
 
 
 class IntegerField(Field):
-    validate_function = int
+    deserialize_function = int
 
 
 class FloatField(IntegerField):
-    validate_function = float
+    deserialize_function = float
 
 
 class DecimalField(Field):
-    validate_function = Decimal
+    deserialize_function = Decimal
 
+    # сделать общее кол-во знаков + кол-во знаков после запятой
     def __init__(
             self,
             source: str,
@@ -118,18 +121,15 @@ class DecimalField(Field):
             select=True,
             validators: List[Callable] | None = None,
             null: bool = False,
-            precision: int = 3
     ):
         super().__init__(source, cast_on, select, validators, null)
-        self.precision = precision
 
-    def field_mapper(self, *args, **kwargs):
-        getcontext().prec = self.precision
-        return super().field_mapper(*args, **kwargs)
+    def deserialize(self, *args, **kwargs):
+        return super().deserialize(*args, **kwargs)
 
 
 class StringField(Field):
-    validate_function = str
+    deserialize_function = str
 
     def _build_result_field(
             self,
@@ -197,7 +197,8 @@ class StringField(Field):
 
 
 class DateTimeField(Field):
-    validate_function = datetime.strptime
+    deserialize_function = datetime.strptime
+    serialize_function = datetime.strftime
 
     def __init__(
             self,
@@ -231,8 +232,11 @@ class DateTimeField(Field):
         else:
             return FilterResultField(f"{self.source} {operand} datetime'{other}'")
 
-    def field_mapper(self, date_string):
-        return self.validate_function(date_string, self.dt_format)
+    def deserialize(self, date_string):
+        return self.deserialize_function(date_string, self.dt_format)
+
+    def serialize(self, obj: datetime):
+        return obj.strftime(self.dt_format)
 
     def __eq__(self, other: str | float | datetime) -> FilterResultField:
         value = self.__cast_compare_value_to_string(other)
@@ -303,13 +307,13 @@ class GUIDField(StringField):
 
 class EmailField(StringField):
 
-    def field_mapper(self, *args, **kwargs):
+    def deserialize(self, *args, **kwargs):
         EmailValidator()(*args, **kwargs)
-        return self.validate_function(*args, **kwargs)
+        return self.deserialize_function(*args, **kwargs)
 
 
 class PhoneNumberField(StringField):
 
-    def field_mapper(self, *args, **kwargs):
+    def deserialize(self, *args, **kwargs):
         PhoneNumberValidator()(*args, **kwargs)
-        return self.validate_function(*args, **kwargs)
+        return self.deserialize_function(*args, **kwargs)

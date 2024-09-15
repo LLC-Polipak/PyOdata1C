@@ -6,37 +6,36 @@ from PyOdata1C.fields import Field, DELIMITER
 class Serializer:
     path: str | None = None
     _data: dict = {}
+    _fields: list = []
 
     def __init__(self, **kwargs):
+        self.__dict__['_fields'] = self._get_fields_for_props()
         for kwarg in kwargs.keys():
-            if kwarg not in self._get_fields_for_props():
+            if kwarg not in self._fields:
                 raise AttributeError(
                     f"'{self.__class__.__name__}' object has no attribute '{kwarg}'")
-        self._data = kwargs
+        self.__dict__['_data'] = kwargs
 
     def __setattr__(self, key, value):
-        if key.startswith('_'):
-            super().__setattr__(key, value)
-        elif key in self._get_fields_for_props():
+        if key in self._fields:
             self._data[key] = value
         else:
             raise AttributeError(
                 f"'{self.__class__.__name__}' object has no attribute '{key}'")
 
     def __getattribute__(self, item):
-        if item in object.__getattribute__(
-                self, '_get_fields_for_props')() and item != 'data':
+        if item in object.__getattribute__(self, '_fields') and item != 'data':
             return self.__getattr__(item)
         return super().__getattribute__(item)
 
     def __getattr__(self, item):
-        if item in self._get_fields_for_props():
+        if item in self._fields:
             return self._data[item]
         raise AttributeError(
             f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
     def __delattr__(self, item):
-        if item in self._get_fields_for_props():
+        if item in self._fields:
             del self._data[item]
         raise AttributeError(
             f"'{self.__class__.__name__}' object has no attribute '{item}'")
@@ -88,21 +87,31 @@ class Serializer:
                         break
             else:
                 obj = data[field.source]
-            new_data[str_field] = field.field_mapper(obj)
+            new_data[str_field] = field.deserialize(obj)
             field.validate(new_data[str_field])
         return cls(**new_data)
 
     @classmethod
-    def deserialize(cls, data):
+    def deserialize(cls, data, many=False):
+        if cls._fields is None:
+            cls._fields = cls._get_fields_for_props()
         validated_data = []
-        for obj in data:
-            validated_data.append(cls.validate(obj))
+        if many:
+            for obj in data:
+                validated_data.append(cls.validate(obj))
+        else:
+            return cls.validate(data)
         return validated_data
 
     @classmethod
     def serialize(cls, obj) -> dict:
+        if cls._fields is None:
+            cls._fields = cls._get_fields_for_props()
         data = {}
         for str_field in cls._get_selected_fields_str():
-            field = getattr(obj, str_field)
-            data[str_field] = field
+            field = getattr(cls, str_field)
+            data[field.source] = field.serialize(getattr(obj, str_field))
         return data
+
+
+
